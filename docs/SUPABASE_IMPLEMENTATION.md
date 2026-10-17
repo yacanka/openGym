@@ -87,9 +87,9 @@ project creation quoted **$0/month**. Project reference: `esbsmagmcmlkpxmnztwp`.
   unauthenticated callers (401).
 - Gitignored frontend config points at the real project using only its URL and
   modern publishable key. Both local configuration files have mode 0600.
-- Auth site URL and exact local root/recovery redirects configured for port
-  5173; public signup and email confirmation are enabled. Minimum password
-  length set to 8. Production URLs await the Render site address.
+- Auth site URL is the Render HTTPS origin. Exact root/recovery redirects are
+  allowed for Render and localhost port 5173; public signup and email
+  confirmation remain enabled. Minimum password length is 8.
 - The user installed all five function settings and the Vault dispatch secret.
   Stored SHA-256 digests match the protected local configuration for every
   setting; Vault and Edge use the same dispatch secret. Values were not printed.
@@ -110,19 +110,32 @@ project creation quoted **$0/month**. Project reference: `esbsmagmcmlkpxmnztwp`.
 
 ## External setup still required
 
-The user has no SMTP service or owned DNS domain yet. Render now contains
-Static Site `srv-db9vnp6q1p3s739p72e0`, assigned
-`https://opengym-6ci9.onrender.com`.
+The user has no SMTP service or owned DNS domain yet. Render Static Site
+`srv-db9vnp6q1p3s739p72e0` is LIVE at
+[`opengym-6ci9.onrender.com`](https://opengym-6ci9.onrender.com), serving commit
+`a27d4ee`. The first deployment's npm lock issue was corrected and redeployed;
+the dashboard confirms "Deploy succeeded|Live".
 The user signed into Render. Source commit `73ef928` is pushed on
 `codex/supabase-static`; `main` remains at the original base. Only implementation
 files were committed; local configuration, data and pre-existing Finder changes
 were excluded. Render Blueprint `exs-db9vngmq1p3s739p65jg` has started creating the
-static site using the versioned build, publish, headers and rewrite settings.
+static site with the versioned build, publish, headers and rewrite settings.
 Its first build failed before compilation: npm 10 found missing optional peer
 records in the lockfile generated with npm 11. The exact failure was reproduced
 in a fresh directory using npm 10. Regenerating the lock with npm 10 added only
 `@emnapi/core` and `@emnapi/runtime`, with no existing package version changes;
-both dry-run and actual clean npm 10 installation now pass.
+both dry-run and actual clean npm 10 installation now pass. After that clean
+install, all 213 frontend tests, four browser contract tests and static build
+passed again. Hosted npm installation, Vite build and upload then succeeded.
+
+Production smoke checks passed for index/security headers, real JPG/GIF assets,
+service worker, bundled Supabase project configuration, and private file/API
+paths returning only the SPA shell. The public JS contains none of the generated
+server private values. Supabase's site URL and exact root/recovery redirects now
+include the Render HTTPS origin; both local and production origins pass Edge
+Function CORS preflight checks. The real user Google consent/return test has
+been handed to the user; provider redirect initialization alone is not counted
+as completed login.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Google is now enabled in public
