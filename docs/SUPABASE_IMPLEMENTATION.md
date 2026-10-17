@@ -177,6 +177,14 @@ build pass. Render deployed worker fix `3c84136` successfully; the live HTTP 200
 no-cache`. The owner was asked to update the worker and repeat the console and
 visible notification checks. Fixing this cache error does not by itself
 establish the notification display failure's cause.
+Final desktop acceptance: after the update, the owner confirmed the cache error
+was gone. Chrome's Push Messaging and Notifications recordings both contained
+the test, with the Notifications event `Notification displayed`. The owner then
+found that macOS had blocked Chrome notifications, corrected that system setting
+and confirmed the notification system works. Visible Mac/Chrome Web Push delivery
+is now verified by the owner. The intermittent HTTP 400 during repeated tests
+was separately confirmed as the existing three-tests-per-minute limit, with
+`Please wait before sending another test`; that rejected request creates no job.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Email confirmation and public signup remain enabled. The user clarified that
@@ -184,8 +192,8 @@ no SMTP service is available yet; custom SMTP is disabled. A managed sender
 service can provide SMTP without running an application or mail server.
 Versioned confirmation/recovery HTML and local template config are prepared;
 the HTML callback contract checks and four callback tests pass. Managed email
-sender setup and hosted template installation, visible desktop/mobile push
-delivery and email end-to-end checks
+sender setup and hosted template installation, mobile/PWA push delivery and
+email end-to-end checks
 remain required before production readiness. Do not send secrets in chat; use
 provider dashboards and managed secret stores. Source implementation and hosted
 schema/functions are ready; the full production acceptance checklist is not yet
