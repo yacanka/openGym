@@ -164,6 +164,17 @@ the outgoing RFC 8291 payload using Web Crypto, including Unicode content, and
 rejects tampering and an incorrect authentication secret. All eight Edge tests
 pass. This fixture check does not prove receipt on the owner's Chrome. A real cloud state row at
 version 1 is now present and contains no device-local active workout field.
+The owner's Chrome GCM diagnostic reports CONNECTED, no decryption failure and
+a received data message. The subsequent worker console exposed a separate fetch
+cache race: `Response.clone()` ran after the page consumed the body while
+`caches.open()` was pending. A delayed-cache test reproduced the failure before
+the fix. The worker now clones before returning the response and registers the
+cache write with `waitUntil()` synchronously; a storage failure logs only its
+error name and does not replace a good network response. Delayed writes, quota
+failure and offline fallback are covered; all 216 frontend tests and the static
+build pass. Deployment of this worker fix and a fresh visible push test remain
+pending; fixing this cache error does not by itself establish the notification
+display failure's cause.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Email confirmation and public signup remain enabled. The user clarified that
