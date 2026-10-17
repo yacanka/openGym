@@ -110,9 +110,20 @@ project creation quoted **$0/month**. Project reference: `esbsmagmcmlkpxmnztwp`.
 
 ## External setup still required
 
-The user confirmed no Render site, SMTP service or owned DNS domain exists yet.
-Render's sign-in screen is open for the user; no site has been created or paid
-service enabled. A custom app domain is not required for Render hosting; a
+The user has no SMTP service or owned DNS domain yet. Render now contains
+Static Site `srv-db9vnp6q1p3s739p72e0`, assigned
+`https://opengym-6ci9.onrender.com`.
+The user signed into Render. Source commit `73ef928` is pushed on
+`codex/supabase-static`; `main` remains at the original base. Only implementation
+files were committed; local configuration, data and pre-existing Finder changes
+were excluded. Render Blueprint `exs-db9vngmq1p3s739p65jg` has started creating the
+static site using the versioned build, publish, headers and rewrite settings.
+Its first build failed before compilation: npm 10 found missing optional peer
+records in the lockfile generated with npm 11. The exact failure was reproduced
+in a fresh directory using npm 10. Regenerating the lock with npm 10 added only
+`@emnapi/core` and `@emnapi/runtime`, with no existing package version changes;
+both dry-run and actual clean npm 10 installation now pass.
+No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Google is now enabled in public
 Auth settings; an actual PKCE authorization request returns a Google redirect
