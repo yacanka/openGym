@@ -1,5 +1,8 @@
 import { create } from 'zustand'
-import { api } from '../lib/api.js'
+import { requireSupabase, supabase, rpc, invoke, sessionHeader } from '../lib/supabase.js'
+import { createAccountSync } from '../lib/account-sync.js'
+import { handleAuthCallback } from '../lib/auth-callback.js'
+import { detachSubscription, reconcileSubscription } from '../lib/push-session.js'
 import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
@@ -32,160 +35,199 @@ const hasData = st => !!((st.workouts || []).length || (st.routines || []).lengt
 export const useStore = create((set, get) => {
   let pushTm = null
   let saveTm = null
-
-  // Mobile build: mirror the state into a file in the app's data directory (survives WebView
-  // storage eviction) and keep the native reminder schedule in step with the weekly plan.
-  const nativePersist = () => {
-    clearTimeout(saveTm)
-    saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S) }, 800)
-  }
-
+  let bootPromise = null
+  let authGeneration = 0
+  const localOnly = MOBILE || DEMO
+  const sync = createAccountSync({
+    storage: localStorage,
+    empty: () => clone(DEF),
+    remote: {
+      async load(id) {
+        const headers = await sessionHeader(id)
+        const { data, error } = await requireSupabase().from('user_states').select('state,version,updated_at').eq('user_id', id).maybeSingle().setHeader('Authorization', headers.Authorization)
+        if (error) throw error
+        return data
+      },
+      save: (id, state, expected_version, mutation_id) => rpc('save_user_state', { state, expected_version, mutation_id }, id)
+    },
+    onState(state) {
+      const S = Object.assign(clone(DEF), state)
+      registerCustom(S.customEx)
+      set({ S })
+    },
+    onStatus(record) {
+      set({ syncStatus: { dirty: record.dirty, conflict: record.conflict, backup: record.backup, error: record.error } })
+    }
+  })
   const persist = (S, push = true) => {
     S._ts = Date.now()
     registerCustom(S.customEx)
-    localStorage.setItem(KEY, JSON.stringify(S))
-    set({ S })
-    if (MOBILE) nativePersist()
-    if (push && get().user) {
+    if (localOnly) {
+      localStorage.setItem(KEY, JSON.stringify(S))
+      set({ S })
+      if (MOBILE) {
+        clearTimeout(saveTm)
+        saveTm = setTimeout(() => { saveTm = null; nativeSave(get().S); syncReminder(get().S) }, 800)
+      }
+      return
+    }
+    sync.update(S, push)
+    if (push && get().user?.allowed) {
       clearTimeout(pushTm)
       pushTm = setTimeout(() => get().pushState(), 1500)
     }
   }
-
-  // A setting changed right before switching away/closing the tab must not get lost mid-debounce
-  // (e.g. setting the reminder time then immediately backgrounding to test it). On mobile the
-  // same applies to the file mirror — backgrounding is often the last thing before the OS
-  // kills the app.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'hidden') return
-    if (MOBILE && saveTm) {
-      clearTimeout(saveTm)
-      saveTm = null
-      nativeSave(get().S)
-    }
-    if (pushTm) {
+  const selectUser = async session => {
+    const generation = ++authGeneration
+    if (!session) {
       clearTimeout(pushTm)
-      pushTm = null
-      get().pushState()
+      sessionStorage.removeItem('gym_recovery')
+      set({ user: null, accountError: null, recovery: false })
+      sync.select(null)
+      return
     }
-  })
-
-  // Everything a sign-out leaves behind on this device, whichever way it was triggered.
-  const clearLocalSession = () => {
-    get().setUser(null)
-    localStorage.removeItem('gym_guest')
-    localStorage.removeItem('gym_dirty')
-    localStorage.removeItem(KEY)
-    persist(clone(DEF), false)
-  }
-
-  return {
-    S: (() => { const s = loadState(); registerCustom(s.customEx); return s })(),
-    user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
-    ready: false,
-
-    // Mutate a draft of S via producer fn, then persist + schedule sync.
-    update(mut, push = true) {
-      const S = clone(get().S)
-      mut(S)
-      persist(S, push)
-    },
-    replaceState(S, push = false) { persist(clone(S), push) },
-
-    isGuest: () => localStorage.getItem('gym_guest') === '1',
-    setGuest(v) { if (v) localStorage.setItem('gym_guest', '1'); else localStorage.removeItem('gym_guest'); set({}) },
-
-    setUser(u) {
-      if (u) { localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest') }
-      else localStorage.removeItem('gym_user')
-      set({ user: u })
-    },
-
-    async pushState() {
-      if (!get().user) return
-      clearTimeout(pushTm)
-      try { await api('/api/data', { method: 'PUT', body: JSON.stringify({ state: get().S }) }); localStorage.removeItem('gym_dirty') }
-      catch (e) { localStorage.setItem('gym_dirty', '1') }
-    },
-    async pullState() {
-      try {
-        const { state } = await api('/api/data')
-        const S = get().S
-        const dirty = localStorage.getItem('gym_dirty') === '1'
-        if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
-          const active = S.active
-          const next = Object.assign(clone(DEF), state)
-          if (active) next.active = active
-          persist(next, false)
-        } else if (hasData(S)) { await get().pushState() }
-      } catch (e) { /* offline — keep local */ }
-    },
-
-    async signOut() {
-      try { await get().pushState(); await api('/api/logout', { method: 'POST', body: '{}' }) } catch (e) { /* */ }
-      clearLocalSession()
-    },
-
-    // "Sign out everywhere": the server bumps this profile's session version, which kills every
-    // session it has on any device — this browser included, so the app has to end up exactly
-    // where a normal signOut leaves it. Unlike signOut the request is NOT swallowed: if it fails
-    // the sessions elsewhere are all still valid, and wiping this device's copy of the data
-    // would sign the user out of the one place the bump didn't reach. Caller reports the error.
-    async signOutAll() {
-      await get().pushState()   // never throws — stores gym_dirty and moves on when offline
-      await api('/api/logout/all', { method: 'POST', body: '{}' })
-      clearLocalSession()
-    },
-
-    // Demo build only: drop the seeded example profile back in (Settings → "Reset demo data").
-    // Dynamic import so the generator never ships in a self-hosted bundle.
-    async resetDemo() {
-      const { buildDemoState } = await import('../lib/demoSeed.js')
-      localStorage.removeItem('gym_dirty')
-      persist(Object.assign(clone(DEF), buildDemoState()), false)
-    },
-
-    // Boot: ask the server who we are, then pull.
-    async boot() {
-      // Mobile build: no backend either — restore from the file mirror (the durable copy;
-      // localStorage may have been evicted since the last run) and go straight in.
-      if (MOBILE) {
-        const saved = await nativeLoad()
-        const S = get().S
-        if (saved && (!hasData(S) || (saved._ts || 0) >= (S._ts || 0))) {
-          persist(Object.assign(clone(DEF), saved), false)
-        } else if (hasData(S)) {
-          nativeSave(S)   // first run after an update from a file-less version: seed the mirror
+    try {
+      const user = await rpc('account_status')
+      if (generation !== authGeneration) return
+      const changed = get().user?.id !== user.id
+      if (changed) {
+        try {
+          await reconcileSubscription(navigator.serviceWorker, endpoint => rpc('push_subscription_status', { endpoint }, user.id))
+        } catch {
+          // A binding that cannot be confirmed must not follow an account switch.
+          try { await detachSubscription(navigator.serviceWorker, async () => {}) } catch { /* Browser unavailable. */ }
         }
-        get().setGuest(true)
-        syncReminder(get().S)
-        set({ ready: true })
-        return
+        if (generation !== authGeneration) return
       }
-      // Demo build (GitHub Pages): no backend at all — seed once, stay in guest mode.
-      if (DEMO) {
-        if (!localStorage.getItem(DEMO_SEEDED)) {
-          localStorage.setItem(DEMO_SEEDED, '1')
-          await get().resetDemo()
-        }
-        get().setGuest(true)
-        set({ ready: true })
-        return
-      }
-      try {
-        const me = await api('/api/me')
-        get().setUser(me.user)
-        await get().pullState()
-        // Re-stamp the reminder's timezone on every load — keeps it correct if you're travelling,
-        // without needing to revisit Settings.
+      set({ user, accountError: null })
+      localStorage.removeItem('gym_guest')
+      if (changed) sync.select(user.id)
+      if (user.allowed) {
+        await sync.sync()
         const tz = localTZ()
-        if (get().S.reminder?.on && get().S.reminder.tz !== tz) {
+        if (generation === authGeneration && get().S.reminder?.on && get().S.reminder.tz !== tz) {
           get().update(s => { s.reminder = { ...s.reminder, tz } })
         }
-      } catch (e) {
-        if (e.status === 401) get().setUser(null)
       }
-      set({ ready: true })
+    } catch (e) {
+      if (generation !== authGeneration) return
+      if (e.status === 403) {
+        set({ user: null, accountError: e.message })
+        sync.select(null)
+      } else {
+        // Offline access is limited to this already-authenticated account's cache.
+        set({ user: { id: session.user.id, name: session.user.user_metadata?.name || 'Athlete', allowed: true, admin: false }, accountError: e.message })
+        sync.select(session.user.id)
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (MOBILE && saveTm) { clearTimeout(saveTm); saveTm = null; nativeSave(get().S) }
+      if (pushTm) { clearTimeout(pushTm); pushTm = null; get().pushState() }
+    } else if (!localOnly) get().refreshAuth()
+  })
+  window.addEventListener('online', () => { if (!localOnly) get().refreshAuth() })
+
+  const initialState = localOnly ? loadState() : clone(DEF)
+  registerCustom(initialState.customEx)
+  return {
+    S: initialState, user: null, ready: false,
+    accountError: null, recovery: false,
+    syncStatus: { dirty: false, conflict: null, backup: null, error: null },
+    update(mut, push = true) { const S=clone(get().S); mut(S); persist(S,push) },
+    replaceState(S,push=false) { persist(clone(S),push) },
+    isGuest: () => localStorage.getItem('gym_guest') === '1',
+    setGuest(v) {
+      if (v) localStorage.setItem('gym_guest','1'); else localStorage.removeItem('gym_guest')
+      set({})
+    },
+    async refreshAuth() {
+      if (!supabase || localOnly) return
+      const { data, error } = await supabase.auth.getSession()
+      if (error) { set({ accountError: error.message }); return }
+      await selectUser(data.session)
+    },
+    async pushState() {
+      if (localOnly || !get().user?.allowed) return
+      clearTimeout(pushTm)
+      await sync.sync()
+    },
+    async pullState() { if (!localOnly && get().user?.allowed) await sync.sync() },
+    async resolveConflict(choice) { await sync.resolve(choice) },
+    guestData: () => sync.guest(),
+    hasGuestData: () => hasData(sync.guest()),
+    async importGuest() {
+      if (!get().user?.allowed) return
+      persist(clone(sync.guest()))
+      await get().pushState()
+    },
+    async signOut() {
+      await get().pushState()
+      if (supabase) {
+        // Detach this browser's subscription before switching accounts on a shared device.
+        try { await detachSubscription(navigator.serviceWorker, endpoint => invoke('push', { action: 'unsubscribe', endpoint })) }
+        catch { /* Session revocation additionally gates dispatch. */ }
+        const { error } = await supabase.auth.signOut({ scope: 'local' })
+        if (error) throw error
+      }
+      await selectUser(null)
+      localStorage.removeItem('gym_guest')
+      sessionStorage.removeItem('gym_recovery')
+      set({})
+    },
+    async signOutAll() {
+      await get().pushState()
+      try { await detachSubscription(navigator.serviceWorker, endpoint => invoke('push', { action: 'unsubscribe', endpoint })) }
+      catch { /* Global revocation also invalidates every subscription binding. */ }
+      const { error } = await requireSupabase().auth.signOut({ scope: 'global' })
+      if (error) throw error
+      await selectUser(null)
+      localStorage.removeItem('gym_guest')
+      sessionStorage.removeItem('gym_recovery')
+      set({})
+    },
+    finishRecovery() { sessionStorage.removeItem('gym_recovery'); set({ recovery: false }) },
+    async resetDemo() {
+      const { buildDemoState } = await import('../lib/demoSeed.js')
+      persist(Object.assign(clone(DEF),buildDemoState()),false)
+    },
+    boot() {
+      if (bootPromise) return bootPromise
+      bootPromise = (async () => {
+        if (MOBILE) {
+          const saved=await nativeLoad()
+          if (saved && (!hasData(get().S) || (saved._ts||0)>=(get().S._ts||0))) persist(Object.assign(clone(DEF),saved),false)
+          else if (hasData(get().S)) nativeSave(get().S)
+          get().setGuest(true); syncReminder(get().S); set({ ready: true }); return
+        }
+        if (DEMO) {
+          if (!localStorage.getItem(DEMO_SEEDED)) { localStorage.setItem(DEMO_SEEDED,'1'); await get().resetDemo() }
+          get().setGuest(true); set({ ready: true }); return
+        }
+        // Preserve pre-migration data without silently attaching it to a new account.
+        if (localStorage.getItem(KEY) && !localStorage.getItem('gym_legacy_backup_v1')) {
+          localStorage.setItem('gym_legacy_backup_v1',localStorage.getItem(KEY))
+          if (!localStorage.getItem('gym_user') && !localStorage.getItem('gym_account_v2:guest')) {
+            sync.select(null); sync.update(loadState(),false)
+          }
+        }
+        sync.select(null)
+        if (!supabase) { set({ ready:true,accountError:'Supabase is not configured.' }); return }
+        try {
+          const callback=await handleAuthCallback(supabase.auth,location.href,url=>history.replaceState(null,'',url))
+          if (callback.recovery) sessionStorage.setItem('gym_recovery','1')
+          await get().refreshAuth()
+          set({ recovery:sessionStorage.getItem('gym_recovery')==='1' })
+        } catch (e) { set({ accountError:e.message }) }
+        supabase.auth.onAuthStateChange(event => {
+          if (event==='PASSWORD_RECOVERY') { sessionStorage.setItem('gym_recovery','1'); set({recovery:true}) }
+          // Supabase auth callbacks hold a lock: make API calls after returning.
+          if (event!=='INITIAL_SESSION') setTimeout(()=>get().refreshAuth(),0)
+        })
+        set({ready:true})
+      })()
+      return bootPromise
     }
   }
 })

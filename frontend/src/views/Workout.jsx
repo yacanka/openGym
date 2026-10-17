@@ -245,8 +245,7 @@ function ActiveWorkout() {
     const iv = setInterval(() => { if (!stopped) ping(true) }, 20000)
     return () => {
       stopped = true; clearInterval(iv)
-      // best-effort "left" signal: sendBeacon survives a tab close, fetch covers in-app nav
-      try { navigator.sendBeacon?.('/api/activity', new Blob([JSON.stringify({ active: false })], { type: 'application/json' })) } catch { /* */ }
+      // Best effort on navigation; a closed tab is cleared by the 70s heartbeat TTL.
       api('/api/activity', { method: 'POST', body: JSON.stringify({ active: false }) }).catch(() => {})
     }
   }, [])

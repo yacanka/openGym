@@ -1,3 +1,5 @@
+> **Current web/PWA setup:** use [Static hosting with Supabase](SUPABASE.md). The instructions below are retained for the legacy Node/passkey version and do not configure the current frontend.
+
 # Self-hosting openGym
 
 openGym is two small containers (a web server and an API) plus a folder of your data.

@@ -5,10 +5,17 @@ import { api } from '../lib/api.js'
 import { t } from '../lib/i18n.js'
 import { useStore } from './useStore.js'
 
-// Fire-and-forget: lets the server push a "rest over" alert if this tab gets suspended
-// before the local timer completes. No-ops for guests / offline.
-const pushRestTimer = sec => { if (useStore.getState().user) api('/api/push/rest-timer', { method: 'POST', body: JSON.stringify({ seconds: sec }) }).catch(() => {}) }
-const cancelPushRestTimer = () => { if (useStore.getState().user) api('/api/push/rest-timer/cancel', { method: 'POST', body: '{}' }).catch(() => {}) }
+// Serialize cancel/start/extend so network reordering cannot cancel a newer timer.
+let restRequest = Promise.resolve()
+function queueRest(path, body = {}) {
+  const id = useStore.getState().user?.id
+  if (!id) return
+  restRequest = restRequest.catch(() => {}).then(() => {
+    if (useStore.getState().user?.id === id) return api(path, { method: 'POST', body: JSON.stringify(body) })
+  }).catch(() => {})
+}
+const pushRestTimer = sec => queueRest('/api/push/rest-timer', { seconds: sec })
+const cancelPushRestTimer = () => queueRest('/api/push/rest-timer/cancel')
 
 let toastTm = null
 let timerInt = null
@@ -69,10 +76,10 @@ export const useUI = create((set, get) => ({
     set({ timer: { ...tm, left, total: tm.total + sec, endsAt: tm.endsAt + sec * 1000 } })
     pushRestTimer(left)
   },
-  stopRest() {
+  stopRest(notify = true) {
     if (timerInt) clearInterval(timerInt); timerInt = null
     if (timerTick) document.removeEventListener('visibilitychange', timerTick); timerTick = null
-    if (get().timer) cancelPushRestTimer()
+    if (get().timer && notify) cancelPushRestTimer()
     set({ timer: null })
   },
 

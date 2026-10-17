@@ -1,3 +1,5 @@
+> The native behavior described here is preserved. The current web/PWA variant uses [Supabase](SUPABASE.md) with Google/email accounts instead of the legacy passkey server referenced below.
+
 # Building the mobile app (iOS / Android)
 
 openGym ships in two flavors from the same codebase:

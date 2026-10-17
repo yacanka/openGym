@@ -1,59 +1,25 @@
-// Backend + WebAuthn helpers (ported from the vanilla app).
+// Feature compatibility boundary: Supabase operations, never the retired Node API.
+import { rpc, invoke } from './supabase.js'
 export const IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)
 export const IS_ANDROID = /Android/.test(navigator.userAgent)
-export const BIO = IS_APPLE ? 'Face ID / Touch ID' : IS_ANDROID ? 'fingerprint or face unlock' : 'your fingerprint, face or PIN'
-export const VAULT = IS_APPLE ? 'iCloud Keychain' : IS_ANDROID ? 'Google Password Manager' : 'your password manager'
-export const webauthnOK = () => !!(window.PublicKeyCredential && navigator.credentials)
 
-export async function api(path, opts) {
-  const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts))
-  const data = await r.json().catch(() => ({}))
-  if (!r.ok) { const e = new Error(data.error || ('HTTP ' + r.status)); e.status = r.status; throw e }
-  return data
-}
-
-const bufToB64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-const b64uToBuf = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)).buffer
-
-function toCreationOptions(o) {
-  o.challenge = b64uToBuf(o.challenge)
-  o.user.id = b64uToBuf(o.user.id)
-  ;(o.excludeCredentials || []).forEach(c => { c.id = b64uToBuf(c.id) })
-  return o
-}
-function toRequestOptions(o) {
-  o.challenge = b64uToBuf(o.challenge)
-  ;(o.allowCredentials || []).forEach(c => { c.id = b64uToBuf(c.id) })
-  return o
-}
-function credToJSON(cred) {
-  const r = cred.response
-  const out = {
-    id: cred.id, rawId: bufToB64u(cred.rawId), type: cred.type,
-    clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {},
-    authenticatorAttachment: cred.authenticatorAttachment || null,
-    response: { clientDataJSON: bufToB64u(r.clientDataJSON) }
+export async function api(path, opts = {}) {
+  const body = opts.body ? JSON.parse(opts.body) : {}
+  const url = new URL(path, location.origin)
+  switch (url.pathname) {
+    case '/api/activity': return rpc('update_activity', { activity: body })
+    case '/api/push/rest-timer': return rpc('schedule_rest', { seconds: body.seconds })
+    case '/api/push/rest-timer/cancel': return rpc('cancel_rest')
+    case '/api/push/public-key': return invoke('push', { action: 'public-key' })
+    case '/api/push/subscribe': return invoke('push', { ...body, action: 'subscribe' })
+    case '/api/push/unsubscribe': return invoke('push', { ...body, action: 'unsubscribe' })
+    case '/api/push/test': return invoke('push', { action: 'test' })
+    case '/api/admin/users': return invoke('admin', { action: 'users' })
+    case '/api/admin/user': return invoke('admin', { action: 'user', id: url.searchParams.get('id') })
+    case '/api/admin/user/disable': return invoke('admin', { ...body, action: 'disable' })
+    case '/api/admin/invites': return invoke('admin', { action: 'invites' })
+    case '/api/admin/invites/new': return invoke('admin', { ...body, action: 'new-invite' })
+    case '/api/admin/invites/revoke': return invoke('admin', { ...body, action: 'revoke-invite' })
+    default: throw new Error('Unsupported operation')
   }
-  if (r.attestationObject) {
-    out.response.attestationObject = bufToB64u(r.attestationObject)
-    out.response.transports = r.getTransports ? r.getTransports() : ['internal']
-  }
-  if (r.authenticatorData) {
-    out.response.authenticatorData = bufToB64u(r.authenticatorData)
-    out.response.signature = bufToB64u(r.signature)
-    out.response.userHandle = r.userHandle ? bufToB64u(r.userHandle) : null
-  }
-  return out
-}
-export async function passkeyRegister(name, code) {
-  const { cid, options } = await api('/api/register/options', { method: 'POST', body: JSON.stringify({ name, code: code || '' }) })
-  const cred = await navigator.credentials.create({ publicKey: toCreationOptions(options) })
-  const res = await api('/api/register/verify', { method: 'POST', body: JSON.stringify({ cid, credential: credToJSON(cred) }) })
-  return res.user
-}
-export async function passkeyLogin() {
-  const { cid, options } = await api('/api/login/options', { method: 'POST', body: '{}' })
-  const cred = await navigator.credentials.get({ publicKey: toRequestOptions(options) })
-  const res = await api('/api/login/verify', { method: 'POST', body: JSON.stringify({ cid, credential: credToJSON(cred) }) })
-  return res.user
 }

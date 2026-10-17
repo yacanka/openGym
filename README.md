@@ -1,3 +1,5 @@
+> **Current web deployment:** openGym now uses a static frontend with Supabase Auth, database and managed functions. See [Supabase setup](docs/SUPABASE.md). Legacy server instructions below describe the earlier passkey deployment.
+
 <div align="center">
 
 <img src="assets/banner.png" alt="openGym" width="720">
