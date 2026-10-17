@@ -185,6 +185,32 @@ and confirmed the notification system works. Visible Mac/Chrome Web Push deliver
 is now verified by the owner. The intermittent HTTP 400 during repeated tests
 was separately confirmed as the existing three-tests-per-minute limit, with
 `Please wait before sending another test`; that rejected request creates no job.
+Installed-device acceptance: the owner confirmed the Mac/Chrome PWA opens as a
+separate app and receives a test notification. The owner then installed the
+iPhone/Safari Home Screen PWA and confirmed Google login and a visible test
+notification. The live project now has one Apple and one FCM subscription; the
+iPhone test completed on the first attempt with both provider receipts.
+A single delayed lock-screen test was then enqueued for the explicitly nominated
+owner with a live Apple-bound session, preserving the test rate limit and using
+an idempotent job key. It was scheduled 45 seconds ahead and completed on its
+first attempt with two receipts, including the still-valid Apple subscription.
+The owner confirmed the iPhone received that notification while locked and
+tapping it reopened the installed app. iPhone/Safari Home Screen PWA delivery
+and notification-tap acceptance are complete. The owner did not observe this
+particular delayed notification on the Mac, with Chrome open and the PWA closed.
+At the owner's request a
+second uniquely tagged test was sent with both Chrome and the PWA closed. It
+completed on its first attempt with two live provider receipts; the owner
+confirmed display only on the iPhone. Provider acceptance does not establish
+display on a fully quit desktop browser. A controlled repeat with Chrome open
+on a blank tab, the PWA closed and the Mac awake completed on its first attempt
+with both provider receipts. The owner confirmed the uniquely tagged new
+notification appeared on both the Mac and iPhone. Desktop delivery with Chrome
+running and the PWA closed is therefore verified; the earlier missed desktop
+notification's cause is not established. Fully quit Chrome did not display the
+closed-browser test, consistent with Chromium's documented browser-process
+requirement (https://groups.google.com/a/chromium.org/g/chromium-dev/c/jqrtJCPMb-k).
+No workout or profile state was changed for these tests.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Email confirmation and public signup remain enabled. The user clarified that
@@ -192,8 +218,7 @@ no SMTP service is available yet; custom SMTP is disabled. A managed sender
 service can provide SMTP without running an application or mail server.
 Versioned confirmation/recovery HTML and local template config are prepared;
 the HTML callback contract checks and four callback tests pass. Managed email
-sender setup and hosted template installation, mobile/PWA push delivery and
-email end-to-end checks
+sender setup, hosted template installation and email end-to-end checks
 remain required before production readiness. Do not send secrets in chat; use
 provider dashboards and managed secret stores. Source implementation and hosted
 schema/functions are ready; the full production acceptance checklist is not yet
