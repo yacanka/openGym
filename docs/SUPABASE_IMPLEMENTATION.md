@@ -150,6 +150,15 @@ by the Edge provider allowlist with "Unsupported push service"; no subscription
 or test job was stored. Do not weaken the SSRF allowlist to accept an unidentified
 provider. A Chrome/Safari/Firefox sign-in, genuine state change and push test
 have been handed to the owner for actual browser/device acceptance.
+The owner subsequently tested on Mac/Chrome: after resolving the initial browser
+permission error, one valid FCM subscription and three test jobs were recorded.
+All three jobs completed on their first attempt, each with a receipt linked to
+the still-valid subscription (the dispatch path records this for a 2xx provider
+response). This proves provider acceptance, not display on the Mac; the owner
+reports no visible notification. macOS Chrome notification and Focus settings
+are the next diagnostic check. Native settings inspection was unavailable, so
+these settings and final display remain unverified. A real cloud state row at
+version 1 is now present and contains no device-local active workout field.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Email confirmation and public signup remain enabled. The user clarified that
@@ -157,8 +166,8 @@ no SMTP service is available yet; custom SMTP is disabled. A managed sender
 service can provide SMTP without running an application or mail server.
 Versioned confirmation/recovery HTML and local template config are prepared;
 the HTML callback contract checks and four callback tests pass. Managed email
-sender setup and hosted template installation, a real-device state write and
-desktop/mobile push/email end-to-end checks
+sender setup and hosted template installation, visible desktop/mobile push
+delivery and email end-to-end checks
 remain required before production readiness. Do not send secrets in chat; use
 provider dashboards and managed secret stores. Source implementation and hosted
 schema/functions are ready; the full production acceptance checklist is not yet
