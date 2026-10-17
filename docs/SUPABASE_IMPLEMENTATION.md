@@ -151,13 +151,18 @@ or test job was stored. Do not weaken the SSRF allowlist to accept an unidentifi
 provider. A Chrome/Safari/Firefox sign-in, genuine state change and push test
 have been handed to the owner for actual browser/device acceptance.
 The owner subsequently tested on Mac/Chrome: after resolving the initial browser
-permission error, one valid FCM subscription and three test jobs were recorded.
-All three jobs completed on their first attempt, each with a receipt linked to
+permission error, one valid FCM subscription and four test jobs were recorded.
+All four jobs completed on their first attempt, each with a receipt linked to
 the still-valid subscription (the dispatch path records this for a 2xx provider
 response). This proves provider acceptance, not display on the Mac; the owner
-reports no visible notification. macOS Chrome notification and Focus settings
-are the next diagnostic check. Native settings inspection was unavailable, so
-these settings and final display remain unverified. A real cloud state row at
+reports no visible notification. The owner confirmed macOS Chrome notification
+permission is on and Do Not Disturb is off. Native settings inspection and direct
+Chrome control are unavailable; only the in-app browser is connected. Chrome's
+GCM connection state and decryption failure log were requested to distinguish
+transport from browser-side processing. The Deno test now independently decrypts
+the outgoing RFC 8291 payload using Web Crypto, including Unicode content, and
+rejects tampering and an incorrect authentication secret. All eight Edge tests
+pass. This fixture check does not prove receipt on the owner's Chrome. A real cloud state row at
 version 1 is now present and contains no device-local active workout field.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
