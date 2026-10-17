@@ -172,9 +172,11 @@ the fix. The worker now clones before returning the response and registers the
 cache write with `waitUntil()` synchronously; a storage failure logs only its
 error name and does not replace a good network response. Delayed writes, quota
 failure and offline fallback are covered; all 216 frontend tests and the static
-build pass. Deployment of this worker fix and a fresh visible push test remain
-pending; fixing this cache error does not by itself establish the notification
-display failure's cause.
+build pass. Render deployed worker fix `3c84136` successfully; the live HTTP 200
+`sw.js` exactly matches the fixed source and is served with `Cache-Control:
+no-cache`. The owner was asked to update the worker and repeat the console and
+visible notification checks. Fixing this cache error does not by itself
+establish the notification display failure's cause.
 No paid service was enabled. A custom app domain is not required for Render hosting; a
 managed sender such as Resend separately requires a verified sending domain.
 Email confirmation and public signup remain enabled. The user clarified that
