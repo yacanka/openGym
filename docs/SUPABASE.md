@@ -300,3 +300,41 @@ addresses or full state payloads when investigating failures.
 Rollback: retain browser/JSON backups and the prior deployment. Avoid running
 old and new writers against the same data. No legacy files are deleted and no
 Git history is rewritten by this migration.
+
+## Admin notification management
+
+Open **Settings → Admin → Notifications**. Choose **All eligible users** or
+**One user**, enter a title (up to 80 characters) and message (up to 500), then
+choose **Send now** or **Schedule**. Scheduled times use the administrator's
+browser timezone and are stored as absolute timestamps; the limit is 30 days.
+**Review notification** previews the audience/content/time before confirmation.
+
+The audience is a snapshot of enabled, admitted, confirmed users with a push
+subscription bound to a live session when the campaign is created. Each user
+gets one durable queue job, sent to their currently eligible devices. New users
+joining later are not added. Account, subscription, campaign cancellation and
+author admin status are checked again before dispatch. The queue processes the
+early-expiring jobs first so a broadcast does not block rest timers or reminders.
+Campaigns expire 24 hours after their scheduled time; retries/leases use the
+existing dispatcher. Creating campaigns is limited to ten per minute per admin
+and 10,000 recipients per campaign.
+
+**Notification history** refreshes every 15 seconds, paginates 20 campaigns per
+page and retains campaigns/jobs/receipts for 90 days from creation. It shows
+pending/completed/failed user jobs, accepted provider requests and expired device
+subscriptions separately. A completed job may have no active device at dispatch;
+provider acceptance does not prove display or reading. Cancellation stops
+remaining work, including invalidating current worker leases, but cannot recall
+requests already in flight. For cancellation during sending, interrupted-user
+counts explicitly warn that provider acceptance counts may be incomplete.
+
+An uncertain response retains the draft and reuses its request identifier on an
+unchanged retry, even if its original due time has passed. Keep that page open
+and retry the same draft; reloading or changing the draft starts a new request.
+No service-role secret is used in the frontend. Managed actions go through the
+admin Edge Function and live-session/admin-gated database functions.
+
+Regression coverage is in `supabase/tests/admin-notifications.sql`, the SQL test
+runner's two-connection submission/cancellation cases, Edge input validation and
+`frontend/e2e/admin-notifications.e2e.mjs`. The stock PostgreSQL runner supplies
+local Cron/Vault/HTTP adapters; its retention assertion is local-only.

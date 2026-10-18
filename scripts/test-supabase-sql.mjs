@@ -31,14 +31,27 @@ for (const name of [
   '20261017221419_invite_foreign_key_indexes.sql'
 ])
   await file('supabase/migrations/' + name)
-for (const name of ['core.sql', 'notifications.sql', 'admin.sql'])
+await file('supabase/tests/cron-fixture.sql')
+// Execute the production scheduler body with local extension boundaries.
+const temporary = await mkdtemp(path.join(tmpdir(), 'opengym-cron-test-'))
+try {
+  const migration = await readFile('supabase/migrations/20261017220953_cron.sql', 'utf8')
+  const filename = path.join(temporary, 'cron.sql')
+  await writeFile(filename, migration.split('\n').filter(line => !line.startsWith('create extension')).join('\n'))
+  await file(filename)
+} finally {
+  await rm(temporary, { recursive: true, force: true })
+}
+await file('supabase/migrations/20261018000603_admin_notifications.sql')
+for (const name of ['core.sql', 'notifications.sql', 'admin.sql', 'admin-notifications.sql'])
   await file('supabase/tests/' + name)
 console.log('Core, notification, admin, admission and reminder SQL tests passed.')
 
 // Exercise actual concurrent PostgreSQL sessions, not a mock of transaction semantics.
 const users = [randomUUID(), randomUUID()],
   sessions = [randomUUID(), randomUUID()],
-  code = randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()
+  code = randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase(),
+  campaign = randomUUID()
 for (let i = 0; i < 2; i++)
   await sql(
     `insert into auth.users(id,email,email_confirmed_at)values('${users[i]}','fixture-${i}@example.test',now());insert into auth.sessions(id,user_id)values('${sessions[i]}','${users[i]}');`
@@ -82,29 +95,19 @@ try {
     '1'
   )
   console.log('Concurrent first writes and single-use invitation tests passed.')
+  await sql(`update private.accounts set role='admin',admitted=true where user_id='${users[0]}';
+    insert into private.push_subscriptions(endpoint,user_id,keys,session_id) values('https://fcm.googleapis.com/concurrency-fixture','${users[0]}','{"p256dh":"test-public","auth":"test-auth"}','${sessions[0]}')`)
+  await Promise.all([0,1].map(() => sql(asUser(0,
+    `select public.admin_create_notification('Concurrent test','Body','user','${users[0]}',null,'${campaign}')`))))
+  assert.equal((await sql(`select count(*) from private.notification_jobs where campaign_id='${campaign}'`)).trim(),'1')
+  await Promise.all([0,1].map(() => sql(asUser(0, `select public.admin_cancel_notification('${campaign}')`))))
+  assert.equal((await sql(`select status from private.notification_jobs where campaign_id='${campaign}'`)).trim(),'cancelled')
+  console.log('Concurrent admin submission and cancellation tests passed.')
 } finally {
   await sql(
-    `delete from private.invites where code='${code}';delete from auth.sessions where user_id in('${users[0]}','${users[1]}');delete from auth.users where id in('${users[0]}','${users[1]}')`
+    `delete from private.admin_notifications where id='${campaign}';delete from private.invites where code='${code}';delete from auth.sessions where user_id in('${users[0]}','${users[1]}');delete from auth.users where id in('${users[0]}','${users[1]}')`
   )
 }
 
-// Execute the production scheduler function body with local extension boundaries.
-// This verifies SQL behavior, not hosted extension installation/network delivery.
-const temporary = await mkdtemp(path.join(tmpdir(), 'opengym-cron-test-'))
-try {
-  await file('supabase/tests/cron-fixture.sql')
-  const migration = await readFile('supabase/migrations/20261017220953_cron.sql', 'utf8')
-  const filename = path.join(temporary, 'cron.sql')
-  await writeFile(
-    filename,
-    migration
-      .split('\n')
-      .filter((line) => !line.startsWith('create extension'))
-      .join('\n')
-  )
-  await file(filename)
-  await file('supabase/tests/cron.sql')
-  console.log('Scheduler SQL tests passed with local Vault/HTTP/Cron contract adapters.')
-} finally {
-  await rm(temporary, { recursive: true, force: true })
-}
+await file('supabase/tests/cron.sql')
+console.log('Scheduler SQL tests passed with local Vault/HTTP/Cron contract adapters.')

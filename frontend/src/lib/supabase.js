@@ -47,8 +47,8 @@ export async function rpc(name, args = {}, expectedId) {
   }
   return data
 }
-export async function invoke(name, body) {
-  const headers = await sessionHeader()
+export async function invoke(name, body, expectedId) {
+  const headers = await sessionHeader(expectedId)
   const { data, error } = await requireSupabase().functions.invoke(name, { body, headers })
   if (error) {
     let message = 'Request failed. Please try again.'

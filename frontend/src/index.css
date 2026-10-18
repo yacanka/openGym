@@ -929,3 +929,13 @@ h4.sec{
 .auth-error { color: var(--red); overflow-wrap: anywhere; }
 .account-settings { padding: 16px; }
 .sync-notice { margin-top: 12px; overflow-wrap: anywhere; }
+
+/* Admin announcements follow the existing card and field controls on small screens. */
+.admin-notifications fieldset{border:0;margin:0;padding:0;min-width:0;display:grid;gap:14px}
+.admin-notifications label{display:grid;gap:6px;font-size:.85rem}
+.admin-notifications .field{width:100%;box-sizing:border-box;min-height:44px;min-width:0}
+.admin-notifications select{appearance:auto}
+.admin-notifications input[type="datetime-local"]{max-width:100%}
+.admin-notification-entry{padding:16px 0;border-bottom:1px solid var(--sep)}
+.admin-notification-entry p{margin:8px 0;overflow-wrap:anywhere}
+.admin-notification-entry .tag{flex-shrink:0}

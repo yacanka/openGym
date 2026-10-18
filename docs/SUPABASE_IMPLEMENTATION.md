@@ -223,3 +223,44 @@ remain required before production readiness. Do not send secrets in chat; use
 provider dashboards and managed secret stores. Source implementation and hosted
 schema/functions are ready; the full production acceptance checklist is not yet
 complete.
+
+## Admin notification management (2026-10-18)
+
+Added an administrator-only Notifications card with reviewed single-user/all-user
+announcements, immediate or timezone-aware scheduled delivery, cancellation,
+20-item history pages and 15-second refresh. Campaign recipients are snapshotted
+from enabled/admitted/confirmed users with a live-session push subscription.
+The existing queue/dispatcher handles per-user fanout, retry, expiry and device
+cleanup; frontend code receives no privileged credential. Campaign history and
+receipts are retained for 90 days. Interrupted cancellation explicitly marks
+potentially incomplete provider acceptance counts.
+
+Migration `20261018000603_admin_notifications.sql` is applied to the hosted
+project (local filename aligned to its recorded migration version). Admin Edge
+Function version 4 is ACTIVE. Its first upload encountered a stale import-map
+path retained by the provider; explicitly supplying `deno.json` resolved that
+configuration error. Hosted transactional smoke checks proved creation,
+idempotence, future scheduling, cancellation, history and non-admin denial;
+all synthetic accounts/jobs/subscriptions were rolled back, with no outbound
+broadcast or real-user data change.
+
+Independent review found FIFO bulk-job starvation and scheduled retries blocked
+after their original due time. Both were reproduced as failing regressions and
+fixed: claims now prioritize earliest expiry; identical uncertain drafts can
+reach the database's idempotent lookup after their scheduled instant. Review
+then found no remaining blocker. Local SQL tests also prove concurrent submission
+and cancellation, account/session gates, invalid recipients/input, provider-gone
+counts, in-flight cancellation and 90-day retention. Seven Chromium boundary
+flows, 216 frontend tests and nine Edge tests/type checks pass. Static build
+passes with the existing bundle-size warning. Real provider delivery of existing
+notification types was previously verified; this change's new admin broadcast
+has not been sent to real users as part of automated verification.
+
+Advisor results include the three deliberately authenticated-callable admin
+SECURITY DEFINER RPCs (each checks live-session/admin access and fixes search_path),
+and default-deny RLS without client policies on the private campaign table.
+These are intentional narrow RPC boundaries, not unrestricted client access.
+See [function advisory](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
+and [private-table RLS advisory](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+The existing disabled leaked-password protection warning is unrelated to this
+change; [provider guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).

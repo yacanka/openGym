@@ -1,4 +1,5 @@
 import { authorize, databaseError, handler, HttpError, readBody } from '../_shared/http.ts'
+import { notificationArgs, notificationId } from '../_shared/admin-notifications.ts'
 
 Deno.serve(handler(async req => {
   const client = await authorize(req, true)
@@ -7,6 +8,11 @@ Deno.serve(handler(async req => {
   switch (body.action) {
     case 'users': result = await client.rpc('admin_users'); break
     case 'user': result = await client.rpc('admin_user', { id: body.id }); break
+    case 'notifications':
+      if (!Number.isInteger(body.offset) || Number(body.offset) < 0) throw new HttpError(400, 'Invalid history page')
+      result = await client.rpc('admin_notifications', { page_offset: body.offset }); break
+    case 'create-notification': result = await client.rpc('admin_create_notification', notificationArgs(body)); break
+    case 'cancel-notification': result = await client.rpc('admin_cancel_notification', { campaign: notificationId(body.id) }); break
     case 'disable':
       if (typeof body.disabled !== 'boolean') throw new HttpError(400, 'Invalid account status')
       result = await client.rpc('admin_set_disabled', { id: body.id, disabled: body.disabled }); break
