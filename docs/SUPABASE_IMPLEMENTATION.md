@@ -264,3 +264,13 @@ See [function advisory](https://supabase.com/docs/guides/database/database-linte
 and [private-table RLS advisory](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 The existing disabled leaked-password protection warning is unrelated to this
 change; [provider guidance](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+Render deployment `dep-dba0rslg1s2s73abdr40` of source commit `8c12c48`
+finished **Deploy succeeded | Live**. The live authenticated admin page shows
+the Notifications composer and an empty history through the deployed Edge
+Function; no leftover smoke campaigns are visible. A release query parameter
+was used to bypass the previous cached HTML during verification. The live panel
+screenshot is saved locally as `/private/tmp/opengym-admin-notifications-live.png`.
+Static-media packaging, native-mode and demo-mode builds also passed. The
+isolated local PostgreSQL test server was stopped after verification. Only the
+owner's pre-existing Finder metadata changes remain outside our commits.
