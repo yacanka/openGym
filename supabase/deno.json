@@ -1,0 +1,8 @@
+{
+  "nodeModulesDir": "auto",
+  "lock": true,
+  "tasks": {
+    "check": "deno check functions/admin/index.ts functions/push/index.ts functions/notification-dispatch/index.ts",
+    "test": "deno test --allow-env functions/_shared/"
+  }
+}

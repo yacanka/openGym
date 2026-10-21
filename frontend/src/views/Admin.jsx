@@ -8,8 +8,9 @@ import { workoutVolume, setsDone } from '../lib/history.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
+import AdminNotifications from './AdminNotifications.jsx'
 
-// Admin-only operator dashboard (owner passkey + admin flag; guarded again server-side).
+// Admin-only operator dashboard; every managed operation checks the live account again.
 // Deliberately English-only — it isn't part of the translated end-user surface, so it stays
 // out of the per-language string packs.
 
@@ -132,6 +133,7 @@ export default function Admin() {
       </div>)}
     </div>}
 
+    <AdminNotifications key={user.id} users={users} ownerId={user.id} />
     <InvitesCard invites={invites} reload={loadInvites} />
 
     <h4 className="sec">Users</h4>

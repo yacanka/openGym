@@ -1,6 +1,39 @@
 services:
   - type: web
     name: opengym
-    env: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
+    runtime: static
+    buildCommand: npm --prefix frontend ci && npm --prefix frontend run build:static
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /img/*
+        name: Cache-Control
+        value: public, max-age=2592000, immutable
+      - path: /gif/*
+        name: Cache-Control
+        value: public, max-age=2592000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

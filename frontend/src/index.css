@@ -917,3 +917,25 @@ h4.sec{
   .exmedia img{height:380px}
   .hm-wrap{display:flex;flex-direction:column;align-items:center}
 }
+
+/* Account flows use the same fields, cards and buttons as the training screens. */
+.auth-gate { padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: 90px; }
+.auth-form { display: grid; gap: 14px; text-align: left; }
+.auth-form form { display: grid; gap: 14px; }
+.auth-form label { display: grid; gap: 7px; font-size: 14px; }
+.auth-form input { width: 100%; min-height: 44px; box-sizing: border-box; font-size: 16px; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.auth-actions > .btn { flex: 1 1 140px; }
+.auth-error { color: var(--red); overflow-wrap: anywhere; }
+.account-settings { padding: 16px; }
+.sync-notice { margin-top: 12px; overflow-wrap: anywhere; }
+
+/* Admin announcements follow the existing card and field controls on small screens. */
+.admin-notifications fieldset{border:0;margin:0;padding:0;min-width:0;display:grid;gap:14px}
+.admin-notifications label{display:grid;gap:6px;font-size:.85rem}
+.admin-notifications .field{width:100%;box-sizing:border-box;min-height:44px;min-width:0}
+.admin-notifications select{appearance:auto}
+.admin-notifications input[type="datetime-local"]{max-width:100%}
+.admin-notification-entry{padding:16px 0;border-bottom:1px solid var(--sep)}
+.admin-notification-entry p{margin:8px 0;overflow-wrap:anywhere}
+.admin-notification-entry .tag{flex-shrink:0}

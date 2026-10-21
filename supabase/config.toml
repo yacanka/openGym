@@ -1,0 +1,29 @@
+project_id = "opengym"
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/", "http://localhost:5173/?flow=recovery"]
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+# Hosted projects use the same HTML in Authentication > Emails > Templates.
+[auth.email.template.confirmation]
+subject = "Confirm your openGym email"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your openGym password"
+content_path = "./supabase/templates/recovery.html"
+
+# Functions validate Auth JWTs and active database sessions inside their handlers.
+# The dispatcher instead requires its private scheduler secret.
+[functions.admin]
+verify_jwt = false
+[functions.push]
+verify_jwt = false
+[functions.notification-dispatch]
+verify_jwt = false
